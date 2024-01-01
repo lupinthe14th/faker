@@ -136,11 +136,12 @@ func main() {
 		close(panelOrderItemsChan)
 		bulkInsWg.Wait() // wait for bulk insert goroutine to finish
 	}
-
 	go func() {
 		<-sigs
 		logger.DebugContext(ctx, "received SIGINT or SIGTERM")
 		cancel()
+		logger.InfoContext(ctx, "cancel generating fake data")
+		os.Exit(1)
 	}()
 	logger.InfoContext(ctx, "fisnish generating fake data")
 }
