@@ -56,7 +56,7 @@ func (ps PanelOrderItems) BulkInsert(ctx context.Context, db *sql.DB) (int64, er
 		return math.MinInt, fmt.Errorf("failed to insert multiple records: %w", err)
 	}
 
-	rows, err := result.LastInsertId()
+	rows, err := result.RowsAffected()
 	if err != nil {
 		return math.MinInt, fmt.Errorf("failed to get affected rows: %w", err)
 	}
