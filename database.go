@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -10,16 +11,32 @@ import (
 	"github.com/go-sql-driver/mysql"
 )
 
+type DBConfig struct {
+	DBName   string
+	User     string
+	Password string
+	Addr     string
+}
+
 type sqlOpenFunc func(driverName, dataSourceName string) (*sql.DB, error)
 
 var sqlOpen sqlOpenFunc = sql.Open
 
-func connectDB(ctx context.Context) (*sql.DB, error) {
+func NewDBConfig() *DBConfig {
+	return &DBConfig{
+		DBName:   getEnv("MYSQL_DATABASE", "mydatabase"),
+		User:     getEnv("MYSQL_USER", "user"),
+		Password: getEnv("MYSQL_PASSWORD", "password"),
+		Addr:     getEnvAddr("MYSQL_HOST", "MYSQL_PORT", "localhost", "3306"),
+	}
+}
+
+func connectDB(ctx context.Context, config *DBConfig) (*sql.DB, error) {
 	c := mysql.Config{
-		DBName:    getDBName(),
-		User:      getUser(),
-		Passwd:    getPassword(),
-		Addr:      getAddr(),
+		DBName:    config.DBName,
+		User:      config.User,
+		Passwd:    config.Password,
+		Addr:      config.Addr,
 		Net:       "tcp",
 		ParseTime: true,
 		Collation: "utf8mb4_general_ci",
@@ -28,7 +45,7 @@ func connectDB(ctx context.Context) (*sql.DB, error) {
 
 	db, err := sqlOpen("mysql", c.FormatDSN())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Failed to open the database: %v", err)
 	}
 
 	db.SetConnMaxLifetime(time.Minute * 3)
@@ -36,43 +53,20 @@ func connectDB(ctx context.Context) (*sql.DB, error) {
 	db.SetMaxIdleConns(10)
 
 	if err := db.PingContext(ctx); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Failed to ping the database: %v", err)
 	}
 	return db, nil
 }
 
-func getDBName() string {
-	dbname := os.Getenv("MYSQL_DATABASE")
-	if dbname == "" {
-		dbname = "mydatabase"
+func getEnv(key, defaultValue string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
 	}
-	return dbname
+	return defaultValue
 }
 
-func getUser() string {
-	user := os.Getenv("MYSQL_USER")
-	if user == "" {
-		user = "user"
-	}
-	return user
-}
-
-func getPassword() string {
-	password := os.Getenv("MYSQL_PASSWORD")
-	if password == "" {
-		password = "password"
-	}
-	return password
-}
-
-func getAddr() string {
-	host := os.Getenv("MYSQL_HOST")
-	if host == "" {
-		host = "localhost"
-	}
-	port := os.Getenv("MYSQL_PORT")
-	if port == "" {
-		port = "3306"
-	}
+func getEnvAddr(hostKey, portKey, hostDefault, portDefault string) string {
+	host := getEnv(hostKey, hostDefault)
+	port := getEnv(portKey, portDefault)
 	return strings.Join([]string{host, port}, ":")
 }

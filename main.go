@@ -52,7 +52,7 @@ func main() {
 	faker := gofakeit.NewCrypto()
 	gofakeit.SetGlobalFaker(faker)
 
-	db, err := connectDB(ctx)
+	db, err := connectDB(ctx, NewDBConfig())
 	if err != nil {
 		logger.ErrorContext(ctx, "faker", "Error opening database", err)
 		os.Exit(1)

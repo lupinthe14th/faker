@@ -55,8 +55,7 @@ func TestConnectDB(t *testing.T) {
 
 			ctx := context.Background()
 
-			_, err = connectDB(ctx)
-
+			_, err = connectDB(ctx, NewDBConfig())
 			if (err != nil) != tt.wantErr {
 				t.Errorf("connectDB() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -69,130 +68,66 @@ func TestConnectDB(t *testing.T) {
 	}
 }
 
-func TestGetDBName(t *testing.T) {
+func TestGetEnv(t *testing.T) {
 	tests := []struct {
 		name  string
 		setup func()
 		want  string
 	}{
 		{
-			name:  "Successful Get DB Name by Default",
+			name:  "Successful Get Env by Default",
 			setup: func() {},
-			want:  "mydatabase",
+			want:  "default",
 		},
 		{
-			name: "Successful Get DB Name by Env",
+			name: "Successful Get Env by Env",
 			setup: func() {
 				// set env
-				t.Setenv("MYSQL_DATABASE", "mydatabase2")
+				t.Setenv("TEST_ENV", "test")
 			},
-			want: "mydatabase2",
+			want: "test",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setup()
-			got := getDBName()
+			got := getEnv("TEST_ENV", "default")
 			if got != tt.want {
-				t.Errorf("getDBName() = %v, want %v", got, tt.want)
+				t.Errorf("getEnv() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestGetUser(t *testing.T) {
+func TestGetEnvAddr(t *testing.T) {
 	tests := []struct {
 		name  string
 		setup func()
 		want  string
 	}{
 		{
-			name:  "Successful Get User by Default",
-			setup: func() {},
-			want:  "user",
-		},
-		{
-			name: "Successful Get User by Env",
-			setup: func() {
-				// set env
-				t.Setenv("MYSQL_USER", "user2")
-			},
-			want: "user2",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.setup()
-			got := getUser()
-			if got != tt.want {
-				t.Errorf("getUser() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestGetPassword(t *testing.T) {
-	tests := []struct {
-		name  string
-		setup func()
-		want  string
-	}{
-		{
-			name:  "Successful Get Password by Default",
-			setup: func() {},
-			want:  "password",
-		},
-		{
-			name: "Successful Get Password by Env",
-			setup: func() {
-				// set env
-				t.Setenv("MYSQL_PASSWORD", "password2")
-			},
-			want: "password2",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.setup()
-			got := getPassword()
-			if got != tt.want {
-				t.Errorf("getPassword() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestGetAddr(t *testing.T) {
-	tests := []struct {
-		name  string
-		setup func()
-		want  string
-	}{
-		{
-			name:  "Successful Get Addr by Default",
+			name:  "Successful Get Env Addr by Default",
 			setup: func() {},
 			want:  "localhost:3306",
 		},
 		{
-			name: "Successful Get Addr by Env",
+			name: "Successful Get Env Addr by Env",
 			setup: func() {
 				// set env
-				t.Setenv("MYSQL_HOST", "localhost2")
-				t.Setenv("MYSQL_PORT", "33062")
+				t.Setenv("TEST_HOST", "test")
+				t.Setenv("TEST_PORT", "1234")
 			},
-			want: "localhost2:33062",
+			want: "test:1234",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setup()
-			got := getAddr()
+			got := getEnvAddr("TEST_HOST", "TEST_PORT", "localhost", "3306")
 			if got != tt.want {
-				t.Errorf("getAddr() = %v, want %v", got, tt.want)
+				t.Errorf("getEnvAddr() = %v, want %v", got, tt.want)
 			}
 		})
 	}
