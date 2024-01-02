@@ -44,7 +44,9 @@ func main() {
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	logger.InfoContext(ctx, "start generating fake data")
+
+	slog.SetDefault(logger)
+	slog.InfoContext(ctx, "start generating fake data")
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
@@ -54,7 +56,7 @@ func main() {
 
 	db, err := connectDB(ctx, NewDBConfig())
 	if err != nil {
-		logger.ErrorContext(ctx, "faker", "Error opening database", err)
+		slog.ErrorContext(ctx, "faker", "Error opening database", err)
 		os.Exit(1)
 	}
 	defer db.Close()
@@ -63,11 +65,11 @@ func main() {
 	}
 
 	batchSize := *batchSizePtr
-	logger.DebugContext(ctx, "Initialize goroutines configurations", "batchSize", batchSize)
+	slog.DebugContext(ctx, "Initialize goroutines configurations", "batchSize", batchSize)
 	numWorkers := *numWorkersPtr
-	logger.DebugContext(ctx, "Initialize goroutines configurations", "numWorkers", numWorkers)
+	slog.DebugContext(ctx, "Initialize goroutines configurations", "numWorkers", numWorkers)
 	numRecords := *numRecordsPtr
-	logger.DebugContext(ctx, "Initialize goroutines configurations", "numRecords", numRecords)
+	slog.DebugContext(ctx, "Initialize goroutines configurations", "numRecords", numRecords)
 
 	switch kingpinMustParse {
 	case generate.FullCommand():
@@ -82,7 +84,7 @@ func main() {
 				for j := 0; j < numRecords/numWorkers; j++ {
 					panelOrderItem := PanelOrderItem{}
 					if err := gofakeit.Struct(&panelOrderItem); err != nil {
-						logger.ErrorContext(ctx, "Failed to generate fake data", "error", err)
+						slog.ErrorContext(ctx, "Failed to generate fake data", "error", err)
 						continue
 					}
 
@@ -105,28 +107,24 @@ func main() {
 				select {
 				case panelOrderItem, ok := <-panelOrderItemsChan:
 					if !ok {
-						logger.DebugContext(ctx, "Channel is closed so insert remaining rows")
+						slog.DebugContext(ctx, "Channel is closed so insert remaining rows")
 						if len(bulkInsBatch) > 0 {
-							c, err := bulkInsBatch.BulkInsert(ctx, db)
-							if err != nil {
-								logger.ErrorContext(ctx, "Failed to bulk insert", "error", err)
+							if err := bulkInsBatch.BulkInsert(ctx, db); err != nil {
+								slog.ErrorContext(ctx, "Failed to bulk insert", "error", err)
 							}
-							logger.DebugContext(ctx, "bulk insert rows", "rows", c)
 						}
 						return
 					}
 
 					bulkInsBatch = append(bulkInsBatch, panelOrderItem...)
 					if len(bulkInsBatch) == batchSize {
-						c, err := bulkInsBatch.BulkInsert(ctx, db)
-						if err != nil {
-							logger.ErrorContext(ctx, "Failed to bulk insert", "error", err)
+						if err := bulkInsBatch.BulkInsert(ctx, db); err != nil {
+							slog.ErrorContext(ctx, "Failed to bulk insert", "error", err)
 						}
-						logger.DebugContext(ctx, "bulk insert rows", "rows", c)
 						bulkInsBatch = make(PanelOrderItems, 0, batchSize)
 					}
 				case <-ctx.Done():
-					logger.DebugContext(ctx, "Close channel to notify worker goroutines to stop")
+					slog.DebugContext(ctx, "Close channel to notify worker goroutines to stop")
 					return
 				}
 			}
@@ -138,10 +136,10 @@ func main() {
 	}
 	go func() {
 		<-sigs
-		logger.DebugContext(ctx, "received SIGINT or SIGTERM")
+		slog.DebugContext(ctx, "received SIGINT or SIGTERM")
 		cancel()
-		logger.InfoContext(ctx, "cancel generating fake data")
+		slog.InfoContext(ctx, "cancel generating fake data")
 		os.Exit(1)
 	}()
-	logger.InfoContext(ctx, "fisnish generating fake data")
+	slog.InfoContext(ctx, "fisnish generating fake data")
 }

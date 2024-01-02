@@ -33,7 +33,7 @@ func TestPanelOrderItemsBulkInsert(t *testing.T) {
 			name: "Failed Insert",
 			items: PanelOrderItems{
 				{PanelOrderID: 1, QuestionID: 1, OrderIndex: 1},
-				{PanelOrderID: 2, QuestionID: 2, OrderIndex: 2},
+				{PanelOrderID: 1, QuestionID: 1, OrderIndex: 1},
 			},
 			wantErr: true,
 		},
@@ -52,13 +52,14 @@ func TestPanelOrderItemsBulkInsert(t *testing.T) {
 
 			if tt.wantErr {
 				mock.ExpectExec("INSERT INTO panel_order_items").WithArgs(mockArgs...).WillReturnError(fmt.Errorf("failed to insert multiple records"))
+				mock.ExpectRollback()
 			} else {
 				mock.ExpectExec("INSERT INTO panel_order_items").WithArgs(mockArgs...).WillReturnResult(sqlmock.NewResult(1, int64(len(tt.items))))
 				mock.ExpectCommit()
 			}
 
 			// BulkInsert関数を呼び出し
-			_, err := tt.items.BulkInsert(ctx, db)
+			err := tt.items.BulkInsert(ctx, db)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("PanelOrderItems.BulkInsert() error = %v, wantErr %v", err, tt.wantErr)
 			}

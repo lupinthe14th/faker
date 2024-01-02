@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
-	"math"
 	"strings"
 )
 
@@ -17,8 +16,8 @@ type PanelOrderItem struct {
 
 type PanelOrderItems []PanelOrderItem
 
-func (ps PanelOrderItems) BulkInsert(ctx context.Context, db *sql.DB) (int64, error) {
-	// バルクインサート用のクエリを作成
+func (ps PanelOrderItems) BulkInsert(ctx context.Context, db *sql.DB) error {
+	// Create query for bulk insert
 	var query strings.Builder
 	query.WriteString("INSERT INTO panel_order_items (panel_order_id, question_id, order_index) VALUES ")
 	for i := 0; i < len(ps); i++ {
@@ -28,7 +27,7 @@ func (ps PanelOrderItems) BulkInsert(ctx context.Context, db *sql.DB) (int64, er
 		}
 	}
 
-	// バルクインサート用のパラメータを作成
+	// Create params for bulk insert query
 	var params []interface{}
 	for _, p := range ps {
 		params = append(params, p.PanelOrderID, p.QuestionID, p.OrderIndex)
@@ -36,34 +35,38 @@ func (ps PanelOrderItems) BulkInsert(ctx context.Context, db *sql.DB) (int64, er
 
 	txn, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		return math.MinInt, fmt.Errorf("failed to begin transaction: %w", err)
+		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer func() {
+		// rollback if panic
 		if p := recover(); p != nil {
-			if rerr := txn.Rollback(); rerr != nil {
-				slog.ErrorContext(ctx, "failed to rollback transaction after panic", "error", rerr)
+			if err := txn.Rollback(); err != nil && err != sql.ErrTxDone {
+				slog.ErrorContext(ctx, "failed to rollback transaction after panic", "error", err)
 			}
-			panic(p)
-		} else if err != nil {
-			if rerr := txn.Rollback(); rerr != nil {
-				slog.ErrorContext(ctx, "failed to rollback transaction", "error", rerr)
-			}
+			panic(p) // re-throw panic after Rollback
+		} else if rerr := txn.Rollback(); rerr != nil && rerr != sql.ErrTxDone {
+			// err is non-nil; stop the panic and return error
+			slog.ErrorContext(ctx, "failed to rollback transaction", "error", rerr)
+			return
 		}
 	}()
 
 	result, err := txn.ExecContext(ctx, query.String(), params...)
 	if err != nil {
-		return math.MinInt, fmt.Errorf("failed to insert multiple records: %w", err)
+		return fmt.Errorf("failed to insert multiple records: %w", err)
 	}
 
 	rows, err := result.RowsAffected()
 	if err != nil {
-		return math.MinInt, fmt.Errorf("failed to get affected rows: %w", err)
+		return fmt.Errorf("failed to get affected rows: %w", err)
 	}
 
-	if err := txn.Commit(); err != nil {
-		return math.MinInt, fmt.Errorf("failed to commit transaction: %w", err)
+	lastID, err := result.LastInsertId()
+	if err != nil {
+		return fmt.Errorf("failed to get last insert id: %w", err)
 	}
 
-	return rows, nil
+	slog.DebugContext(ctx, "inserted multiple records", "rows_affected", rows, "last_insert_id", lastID)
+
+	return txn.Commit()
 }
