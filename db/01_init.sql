@@ -1,3 +1,2 @@
-DROP DATABASE IF EXISTS mydatabase;
-CREATE DATABASE mydatabase;
+CREATE DATABASE IF NOT EXISTS mydatabase;
 USE mydatabase;
