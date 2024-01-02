@@ -36,7 +36,7 @@ test: build
 
 .PHONY: clean
 clean:
-	rm -rf $(BIN) goxz
+	rm -rf $(BIN) goxz dist
 	go clean
 
 .PHONY: bump
