@@ -31,22 +31,31 @@ var (
 	generate = app.Command("generate", "Generate fake data")
 )
 
-func main() {
-	kingpinMustParse := kingpin.MustParse(app.Parse(os.Args[1:]))
-
+func setupLogging(ctx context.Context) {
 	logLevel := new(slog.LevelVar)
 	opts := &slog.HandlerOptions{
 		AddSource: *debug,
 		Level:     logLevel,
 	}
+
 	handler := slog.NewJSONHandler(os.Stdout, opts)
 	logger := slog.New(handler).With(
 		"app", app.Name,
 	)
 
-	ctx, cancel := context.WithCancel(context.Background())
-
 	slog.SetDefault(logger)
+
+	if *debug {
+		logLevel.Set(slog.LevelDebug)
+	}
+}
+
+func main() {
+	kingpinMustParse := kingpin.MustParse(app.Parse(os.Args[1:]))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	setupLogging(ctx)
+
 	slog.InfoContext(ctx, "start generating fake data")
 
 	sigs := make(chan os.Signal, 1)
@@ -61,9 +70,6 @@ func main() {
 		os.Exit(1)
 	}
 	defer db.Close()
-	if *debug {
-		logLevel.Set(slog.LevelDebug)
-	}
 
 	batchSize := *batchSizePtr
 	slog.DebugContext(ctx, "Initialize goroutines configurations", "batchSize", batchSize)
