@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 
@@ -18,8 +19,10 @@ const (
 )
 
 var (
-	revision      = "HEAD"
-	app           = kingpin.New("faker", "A command-line tool to generate fake data and insert into database").Version(version)
+	commit        = "HEAD"
+	date          = "2021-09-30T00:00:00Z"
+	builtBy       = "unknown"
+	app           = kingpin.New("faker", "A command-line tool to generate fake data and insert into database").Version(strings.Join([]string{version, commit, date, builtBy}, " "))
 	debug         = app.Flag("debug", "Enable debug mode").Short('d').Bool()
 	batchSizePtr  = app.Flag("batch-size", "Number of records to insert in a batch").Default("10000").Int()
 	numWorkersPtr = app.Flag("num-workers", "Number of workers to generate fake data").Default("10").Int()
@@ -38,8 +41,6 @@ func main() {
 	}
 	handler := slog.NewJSONHandler(os.Stdout, opts)
 	logger := slog.New(handler).With(
-		"revision", revision,
-		"version", version,
 		"app", app.Name,
 	)
 
