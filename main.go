@@ -33,6 +33,10 @@ var (
 
 func setupLogging(ctx context.Context) {
 	logLevel := new(slog.LevelVar)
+	logLevel.Set(slog.LevelError)
+	if *debug {
+		logLevel.Set(slog.LevelDebug)
+	}
 	opts := &slog.HandlerOptions{
 		AddSource: *debug,
 		Level:     logLevel,
@@ -44,10 +48,6 @@ func setupLogging(ctx context.Context) {
 	)
 
 	slog.SetDefault(logger)
-
-	if *debug {
-		logLevel.Set(slog.LevelDebug)
-	}
 }
 
 func main() {
