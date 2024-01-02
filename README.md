@@ -28,7 +28,7 @@ go test -v --cover --race ./...
 
 ### MySQL
 
-#### Show database table sizes in MB and fragmented space in MB
+#### Show database table sizes in GB and fragmented space in GB
 
 ```sql
 SELECT
