@@ -86,7 +86,7 @@ func main() {
 					panelOrderItem := PanelOrderItem{}
 					if err := gofakeit.Struct(&panelOrderItem); err != nil {
 						slog.ErrorContext(ctx, "Failed to generate fake data", "error", err)
-						continue
+						return
 					}
 
 					panelOrderItemsChan <- PanelOrderItems{
@@ -121,6 +121,7 @@ func main() {
 					if len(bulkInsBatch) == batchSize {
 						if err := bulkInsBatch.BulkInsert(ctx, db); err != nil {
 							slog.ErrorContext(ctx, "Failed to bulk insert", "error", err)
+							return
 						}
 						bulkInsBatch = make(PanelOrderItems, 0, batchSize)
 					}
