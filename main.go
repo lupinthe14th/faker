@@ -28,30 +28,11 @@ var (
 	generate = app.Command("generate", "Generate fake data")
 )
 
-func setupLogging(ctx context.Context) {
-	logLevel := new(slog.LevelVar)
-	logLevel.Set(slog.LevelError)
-	if *debug {
-		logLevel.Set(slog.LevelDebug)
-	}
-	opts := &slog.HandlerOptions{
-		AddSource: *debug,
-		Level:     logLevel,
-	}
-
-	handler := slog.NewJSONHandler(os.Stdout, opts)
-	logger := slog.New(handler).With(
-		"app", app.Name,
-	)
-
-	slog.SetDefault(logger)
-}
-
 func main() {
 	kingpinMustParse := kingpin.MustParse(app.Parse(os.Args[1:]))
 
 	ctx, cancel := context.WithCancel(context.Background())
-	setupLogging(ctx)
+	setupLogging(ctx, os.Stdout, app.Name, debug)
 
 	slog.InfoContext(ctx, "start generating fake data")
 
