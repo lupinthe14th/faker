@@ -6,20 +6,26 @@ import (
 	"log/slog"
 )
 
-func setupLogging(ctx context.Context, output io.Writer, appName string, debug *bool) {
+type LoggingConfig struct {
+	Output  io.Writer
+	AppName string
+	Debug   bool
+}
+
+func setupLogging(ctx context.Context, config *LoggingConfig) {
 	logLevel := new(slog.LevelVar)
 	logLevel.Set(slog.LevelError)
-	if *debug {
+	if config.Debug {
 		logLevel.Set(slog.LevelDebug)
 	}
 	opts := &slog.HandlerOptions{
-		AddSource: *debug,
+		AddSource: config.Debug,
 		Level:     logLevel,
 	}
 
-	handler := slog.NewJSONHandler(output, opts)
+	handler := slog.NewJSONHandler(config.Output, opts)
 	logger := slog.New(handler).With(
-		"app", app.Name,
+		"app", config.AppName,
 	)
 
 	slog.SetDefault(logger)

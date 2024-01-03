@@ -32,7 +32,13 @@ func main() {
 	kingpinMustParse := kingpin.MustParse(app.Parse(os.Args[1:]))
 
 	ctx, cancel := context.WithCancel(context.Background())
-	setupLogging(ctx, os.Stdout, app.Name, debug)
+
+	loggingConfig := LoggingConfig{
+		Output:  os.Stdout,
+		AppName: app.Name,
+		Debug:   *debug,
+	}
+	setupLogging(ctx, &loggingConfig)
 
 	slog.InfoContext(ctx, "start generating fake data")
 
