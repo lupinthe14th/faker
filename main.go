@@ -14,11 +14,8 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-const (
-	version = "0.0.0"
-)
-
 var (
+	version       = "0.0.0"
 	commit        = "HEAD"
 	date          = "2021-09-30T00:00:00Z"
 	builtBy       = "unknown"
