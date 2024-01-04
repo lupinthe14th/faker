@@ -28,43 +28,36 @@ var (
 	generate = app.Command("generate", "Generate fake data")
 )
 
-func setupLogging(ctx context.Context) {
-	logLevel := new(slog.LevelVar)
-	logLevel.Set(slog.LevelError)
-	if *debug {
-		logLevel.Set(slog.LevelDebug)
-	}
-	opts := &slog.HandlerOptions{
-		AddSource: *debug,
-		Level:     logLevel,
-	}
-
-	handler := slog.NewJSONHandler(os.Stdout, opts)
-	logger := slog.New(handler).With(
-		"app", app.Name,
-	)
-
-	slog.SetDefault(logger)
-}
-
 func main() {
 	kingpinMustParse := kingpin.MustParse(app.Parse(os.Args[1:]))
 
 	ctx, cancel := context.WithCancel(context.Background())
-	setupLogging(ctx)
+	defer cancel()
+
+	loggingConfig := newLoggingConfig(os.Stdout, app.Name, *debug)
+
+	if err := setupLogging(ctx, loggingConfig); err != nil {
+		slog.ErrorContext(ctx, "Failed to setup logging", "error", err)
+		return
+	}
 
 	slog.InfoContext(ctx, "start generating fake data")
 
+	// Handle SIGINT and SIGTERM.
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
+	// Handle errors from goroutines.
+	errChan := make(chan error, 1)
+
+	// Initialize gofakeit
 	faker := gofakeit.NewCrypto()
 	gofakeit.SetGlobalFaker(faker)
 
 	db, err := connectDB(ctx, NewDBConfig())
 	if err != nil {
 		slog.ErrorContext(ctx, "faker", "Error opening database", err)
-		os.Exit(1)
+		return
 	}
 	defer db.Close()
 
@@ -88,12 +81,14 @@ func main() {
 				for j := 0; j < numRecords/numWorkers; j++ {
 					panelOrderItem := PanelOrderItem{}
 					if err := gofakeit.Struct(&panelOrderItem); err != nil {
-						slog.ErrorContext(ctx, "Failed to generate fake data", "error", err)
+						errChan <- err
 						return
 					}
 
-					panelOrderItemsChan <- PanelOrderItems{
-						panelOrderItem,
+					select {
+					case panelOrderItemsChan <- PanelOrderItems{panelOrderItem}: // send to channel
+					case <-ctx.Done():
+						return // return to stop worker goroutine
 					}
 				}
 			}()
@@ -139,6 +134,18 @@ func main() {
 		close(panelOrderItemsChan)
 		bulkInsWg.Wait() // wait for bulk insert goroutine to finish
 	}
+
+	// Handle errors from goroutines.
+	go func() {
+		select {
+		case err := <-errChan:
+			slog.ErrorContext(ctx, "Error occurred in goroutines", "error", err)
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+
+	// Handle SIGINT and SIGTERM.
 	go func() {
 		<-sigs
 		slog.DebugContext(ctx, "received SIGINT or SIGTERM")
@@ -146,5 +153,6 @@ func main() {
 		slog.InfoContext(ctx, "cancel generating fake data")
 		os.Exit(1)
 	}()
+
 	slog.InfoContext(ctx, "fisnish generating fake data")
 }
