@@ -13,6 +13,14 @@ type LoggingConfig struct {
 	Debug   bool
 }
 
+func newLoggingConfig(output io.Writer, appName string, debug bool) *LoggingConfig {
+	return &LoggingConfig{
+		Output:  output,
+		AppName: appName,
+		Debug:   debug,
+	}
+}
+
 func setupLogging(ctx context.Context, config *LoggingConfig) error {
 	if config == nil {
 		return errors.New("config is nil")

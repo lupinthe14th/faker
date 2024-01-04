@@ -33,13 +33,11 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	loggingConfig := LoggingConfig{
-		Output:  os.Stdout,
-		AppName: app.Name,
-		Debug:   *debug,
-	}
-	if err := setupLogging(ctx, &loggingConfig); err != nil {
+	loggingConfig := newLoggingConfig(os.Stdout, app.Name, *debug)
+
+	if err := setupLogging(ctx, loggingConfig); err != nil {
 		slog.ErrorContext(ctx, "Failed to setup logging", "error", err)
+		os.Exit(1)
 	}
 
 	slog.InfoContext(ctx, "start generating fake data")
