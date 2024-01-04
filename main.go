@@ -38,23 +38,26 @@ func main() {
 
 	if err := setupLogging(ctx, loggingConfig); err != nil {
 		slog.ErrorContext(ctx, "Failed to setup logging", "error", err)
-		cancel()
-		os.Exit(1)
+		return
 	}
 
 	slog.InfoContext(ctx, "start generating fake data")
 
+	// Handle SIGINT and SIGTERM.
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
+	// Handle errors from goroutines.
+	errChan := make(chan error, 1)
+
+	// Initialize gofakeit
 	faker := gofakeit.NewCrypto()
 	gofakeit.SetGlobalFaker(faker)
 
 	db, err := connectDB(ctx, NewDBConfig())
 	if err != nil {
 		slog.ErrorContext(ctx, "faker", "Error opening database", err)
-		cancel()
-		os.Exit(1)
+		return
 	}
 	defer db.Close()
 
@@ -78,12 +81,14 @@ func main() {
 				for j := 0; j < numRecords/numWorkers; j++ {
 					panelOrderItem := PanelOrderItem{}
 					if err := gofakeit.Struct(&panelOrderItem); err != nil {
-						slog.ErrorContext(ctx, "Failed to generate fake data", "error", err)
+						errChan <- err
 						return
 					}
 
-					panelOrderItemsChan <- PanelOrderItems{
-						panelOrderItem,
+					select {
+					case panelOrderItemsChan <- PanelOrderItems{panelOrderItem}: // send to channel
+					case <-ctx.Done():
+						return // return to stop worker goroutine
 					}
 				}
 			}()
@@ -129,6 +134,18 @@ func main() {
 		close(panelOrderItemsChan)
 		bulkInsWg.Wait() // wait for bulk insert goroutine to finish
 	}
+
+	// Handle errors from goroutines.
+	go func() {
+		select {
+		case err := <-errChan:
+			slog.ErrorContext(ctx, "Error occurred in goroutines", "error", err)
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+
+	// Handle SIGINT and SIGTERM.
 	go func() {
 		<-sigs
 		slog.DebugContext(ctx, "received SIGINT or SIGTERM")
@@ -136,5 +153,6 @@ func main() {
 		slog.InfoContext(ctx, "cancel generating fake data")
 		os.Exit(1)
 	}()
+
 	slog.InfoContext(ctx, "fisnish generating fake data")
 }
