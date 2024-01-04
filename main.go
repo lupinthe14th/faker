@@ -32,11 +32,13 @@ func main() {
 	kingpinMustParse := kingpin.MustParse(app.Parse(os.Args[1:]))
 
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	loggingConfig := newLoggingConfig(os.Stdout, app.Name, *debug)
 
 	if err := setupLogging(ctx, loggingConfig); err != nil {
 		slog.ErrorContext(ctx, "Failed to setup logging", "error", err)
+		cancel()
 		os.Exit(1)
 	}
 
@@ -51,6 +53,7 @@ func main() {
 	db, err := connectDB(ctx, NewDBConfig())
 	if err != nil {
 		slog.ErrorContext(ctx, "faker", "Error opening database", err)
+		cancel()
 		os.Exit(1)
 	}
 	defer db.Close()
