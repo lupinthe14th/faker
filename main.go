@@ -154,5 +154,6 @@ func handleSignals(ctx context.Context, cancel context.CancelFunc) {
 		slog.DebugContext(ctx, "received signal", "signal", sig)
 		cancel()
 		slog.InfoContext(ctx, "cancel generating fake data")
+		os.Exit(1)
 	}()
 }
