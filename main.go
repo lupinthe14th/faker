@@ -43,9 +43,7 @@ func main() {
 
 	slog.InfoContext(ctx, "start generating fake data")
 
-	// Handle SIGINT and SIGTERM.
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	handleSignals(ctx, cancel)
 
 	// Handle errors from goroutines.
 	errChan := make(chan error, 1)
@@ -145,14 +143,17 @@ func main() {
 		}
 	}()
 
-	// Handle SIGINT and SIGTERM.
+	slog.InfoContext(ctx, "fisnish generating fake data")
+}
+
+func handleSignals(ctx context.Context, cancel context.CancelFunc) {
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
-		<-sigs
-		slog.DebugContext(ctx, "received SIGINT or SIGTERM")
+		sig := <-sigs
+		slog.DebugContext(ctx, "received signal", "signal", sig)
 		cancel()
 		slog.InfoContext(ctx, "cancel generating fake data")
 		os.Exit(1)
 	}()
-
-	slog.InfoContext(ctx, "fisnish generating fake data")
 }
