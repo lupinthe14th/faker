@@ -43,7 +43,7 @@ func main() {
 
 	slog.InfoContext(ctx, "start generating fake data")
 
-	handleSignals(ctx, cancel)
+	go handleSignals(ctx, cancel)
 
 	// Handle errors from goroutines.
 	errChan := make(chan error, 1)
@@ -143,7 +143,7 @@ func main() {
 		}
 	}()
 
-	slog.InfoContext(ctx, "fisnish generating fake data")
+	slog.InfoContext(ctx, "finish generating fake data")
 }
 
 func handleSignals(ctx context.Context, cancel context.CancelFunc) {
