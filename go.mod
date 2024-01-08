@@ -3,7 +3,7 @@ module github.com/lupinthe14th/faker
 go 1.21
 
 require (
-	github.com/DATA-DOG/go-sqlmock v1.5.1
+	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/brianvoe/gofakeit/v6 v6.26.3
 	github.com/go-sql-driver/mysql v1.7.1
