@@ -8,6 +8,12 @@ import (
 	"strings"
 )
 
+type DataItem interface {
+	BulkInsert(ctx context.Context, db *sql.DB) error
+}
+
+type DataItems []DataItem
+
 type PanelOrderItem struct {
 	PanelOrderID int `fake:"{number:1,100}"`
 	QuestionID   int `fake:"{number:1,100}"`

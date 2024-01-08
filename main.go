@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -98,13 +99,13 @@ func generateData(ctx context.Context, db *sql.DB, errChan chan<- error) {
 	numRecords := *numRecordsPtr
 	slog.DebugContext(ctx, "Initialize goroutines configurations", "numRecords", numRecords)
 
-	dataChan := make(chan PanelOrderItems, batchSize)
+	dataChan := make(chan DataItems, batchSize)
 	var wg sync.WaitGroup
 
 	// Launch worker goroutines
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
-		go worker(ctx, &wg, dataChan, numRecords/numWorkers, errChan)
+		go worker(ctx, &wg, dataChan, numRecords/numWorkers, "PanelOrderItems", errChan)
 	}
 
 	// Launch bulk insert goroutine
@@ -114,49 +115,78 @@ func generateData(ctx context.Context, db *sql.DB, errChan chan<- error) {
 	close(dataChan) // close channel to notify bulk insert goroutine to stop
 }
 
-func worker(ctx context.Context, wg *sync.WaitGroup, dataChan chan<- PanelOrderItems, numRecords int, errChan chan<- error) {
+func worker(ctx context.Context, wg *sync.WaitGroup, dataChan chan<- DataItems, numRecords int, dataType string, errChan chan<- error) {
 	defer wg.Done()
 	for i := 0; i < numRecords; i++ {
-		panelOrderItem := PanelOrderItem{}
-		if err := gofakeit.Struct(&panelOrderItem); err != nil {
+		var dataItems DataItems
+
+		switch dataType {
+		case "PanelOrderItems":
+			var item PanelOrderItem
+			if err := gofakeit.Struct(&item); err != nil {
+				errChan <- err
+				return
+			}
+			dataItems = DataItems{PanelOrderItems{item}}
+
+		default:
+			err := fmt.Errorf("unknown data type: %s", dataType)
+			slog.ErrorContext(ctx, "Unknown data type", "dataType", dataType)
 			errChan <- err
 			return
 		}
 
 		select {
-		case dataChan <- PanelOrderItems{panelOrderItem}: // send to channel
+		case dataChan <- dataItems:
 		case <-ctx.Done():
 			return // return to stop worker goroutine
 		}
 	}
 }
 
-func bulkInserter(ctx context.Context, db *sql.DB, dataChan <-chan PanelOrderItems, batchSize int) {
-	bulkInsBatch := make(PanelOrderItems, 0, batchSize)
+func bulkInserter(ctx context.Context, db *sql.DB, dataChan <-chan DataItems, batchSize int) {
+	panelOrderItemsBatch := make(PanelOrderItems, 0, batchSize)
+
 	for {
 		select {
-		case panelOrderItem, ok := <-dataChan:
+		case items, ok := <-dataChan:
 			if !ok {
 				slog.DebugContext(ctx, "Channel is closed so insert remaining rows")
-				if len(bulkInsBatch) > 0 {
-					if err := bulkInsBatch.BulkInsert(ctx, db); err != nil {
-						slog.ErrorContext(ctx, "Failed to bulk insert", "error", err)
-					}
+				if len(panelOrderItemsBatch) > 0 {
+					processBatch(ctx, db, panelOrderItemsBatch)
 				}
 				return
 			}
 
-			bulkInsBatch = append(bulkInsBatch, panelOrderItem...)
-			if len(bulkInsBatch) == batchSize {
-				if err := bulkInsBatch.BulkInsert(ctx, db); err != nil {
-					slog.ErrorContext(ctx, "Failed to bulk insert", "error", err)
-					return
+			for _, item := range items {
+				switch v := item.(type) {
+				case PanelOrderItems:
+					panelOrderItemsBatch = append(panelOrderItemsBatch, v...)
+					if len(panelOrderItemsBatch) == batchSize {
+						processBatch(ctx, db, panelOrderItemsBatch)
+						panelOrderItemsBatch = make(PanelOrderItems, 0, batchSize)
+					}
+
+				default:
+					slog.ErrorContext(ctx, "Unknown type in batch", "type", fmt.Sprintf("%T", v))
 				}
-				bulkInsBatch = make(PanelOrderItems, 0, batchSize)
 			}
 		case <-ctx.Done():
 			slog.DebugContext(ctx, "Close channel to notify worker goroutines to stop")
 			return
 		}
+	}
+}
+
+func processBatch(ctx context.Context, db *sql.DB, items interface{}) {
+	slog.DebugContext(ctx, "Processing batch", "item", fmt.Sprintf("%T", items))
+	switch v := items.(type) {
+	case PanelOrderItems:
+		slog.DebugContext(ctx, "Inserting PanelOrderItems", "numItems", len(v), "item", fmt.Sprintf("%T", v))
+		if err := v.BulkInsert(ctx, db); err != nil {
+			slog.ErrorContext(ctx, "Failed to bulk insert", "error", err)
+		}
+	default:
+		slog.ErrorContext(ctx, "Unknown type in batch", "type", fmt.Sprintf("%T", v))
 	}
 }
