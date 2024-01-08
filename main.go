@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -59,78 +60,9 @@ func main() {
 	}
 	defer db.Close()
 
-	batchSize := *batchSizePtr
-	slog.DebugContext(ctx, "Initialize goroutines configurations", "batchSize", batchSize)
-	numWorkers := *numWorkersPtr
-	slog.DebugContext(ctx, "Initialize goroutines configurations", "numWorkers", numWorkers)
-	numRecords := *numRecordsPtr
-	slog.DebugContext(ctx, "Initialize goroutines configurations", "numRecords", numRecords)
-
 	switch kingpinMustParse {
 	case generate.FullCommand():
-		panelOrderItemsChan := make(chan PanelOrderItems, batchSize)
-		var wg sync.WaitGroup
-
-		// Worker goroutines
-		for i := 0; i < numWorkers; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				for j := 0; j < numRecords/numWorkers; j++ {
-					panelOrderItem := PanelOrderItem{}
-					if err := gofakeit.Struct(&panelOrderItem); err != nil {
-						errChan <- err
-						return
-					}
-
-					select {
-					case panelOrderItemsChan <- PanelOrderItems{panelOrderItem}: // send to channel
-					case <-ctx.Done():
-						return // return to stop worker goroutine
-					}
-				}
-			}()
-		}
-
-		var bulkInsWg sync.WaitGroup
-		bulkInsWg.Add(1) // for bulk insert goroutine
-
-		// Bulk insert goroutine
-		go func(ctx context.Context) {
-			defer bulkInsWg.Done() // notify when bulk insert goroutine is done
-
-			bulkInsBatch := make(PanelOrderItems, 0, batchSize)
-			for {
-				select {
-				case panelOrderItem, ok := <-panelOrderItemsChan:
-					if !ok {
-						slog.DebugContext(ctx, "Channel is closed so insert remaining rows")
-						if len(bulkInsBatch) > 0 {
-							if err := bulkInsBatch.BulkInsert(ctx, db); err != nil {
-								slog.ErrorContext(ctx, "Failed to bulk insert", "error", err)
-							}
-						}
-						return
-					}
-
-					bulkInsBatch = append(bulkInsBatch, panelOrderItem...)
-					if len(bulkInsBatch) == batchSize {
-						if err := bulkInsBatch.BulkInsert(ctx, db); err != nil {
-							slog.ErrorContext(ctx, "Failed to bulk insert", "error", err)
-							return
-						}
-						bulkInsBatch = make(PanelOrderItems, 0, batchSize)
-					}
-				case <-ctx.Done():
-					slog.DebugContext(ctx, "Close channel to notify worker goroutines to stop")
-					return
-				}
-			}
-		}(ctx)
-
-		wg.Wait() // wait for worker goroutines to finish
-		close(panelOrderItemsChan)
-		bulkInsWg.Wait() // wait for bulk insert goroutine to finish
+		generateData(ctx, db, errChan)
 	}
 
 	// Handle errors from goroutines.
@@ -156,4 +88,75 @@ func handleSignals(ctx context.Context, cancel context.CancelFunc) {
 		slog.InfoContext(ctx, "cancel generating fake data")
 		os.Exit(1)
 	}()
+}
+
+func generateData(ctx context.Context, db *sql.DB, errChan chan<- error) {
+	batchSize := *batchSizePtr
+	slog.DebugContext(ctx, "Initialize goroutines configurations", "batchSize", batchSize)
+	numWorkers := *numWorkersPtr
+	slog.DebugContext(ctx, "Initialize goroutines configurations", "numWorkers", numWorkers)
+	numRecords := *numRecordsPtr
+	slog.DebugContext(ctx, "Initialize goroutines configurations", "numRecords", numRecords)
+
+	dataChan := make(chan PanelOrderItems, batchSize)
+	var wg sync.WaitGroup
+
+	// Launch worker goroutines
+	for i := 0; i < numWorkers; i++ {
+		wg.Add(1)
+		go worker(ctx, &wg, dataChan, numRecords/numWorkers, errChan)
+	}
+
+	// Launch bulk insert goroutine
+	go bulkInserter(ctx, db, dataChan, batchSize)
+
+	wg.Wait()       // wait for worker goroutines to finish
+	close(dataChan) // close channel to notify bulk insert goroutine to stop
+}
+
+func worker(ctx context.Context, wg *sync.WaitGroup, dataChan chan<- PanelOrderItems, numRecords int, errChan chan<- error) {
+	defer wg.Done()
+	for i := 0; i < numRecords; i++ {
+		panelOrderItem := PanelOrderItem{}
+		if err := gofakeit.Struct(&panelOrderItem); err != nil {
+			errChan <- err
+			return
+		}
+
+		select {
+		case dataChan <- PanelOrderItems{panelOrderItem}: // send to channel
+		case <-ctx.Done():
+			return // return to stop worker goroutine
+		}
+	}
+}
+
+func bulkInserter(ctx context.Context, db *sql.DB, dataChan <-chan PanelOrderItems, batchSize int) {
+	bulkInsBatch := make(PanelOrderItems, 0, batchSize)
+	for {
+		select {
+		case panelOrderItem, ok := <-dataChan:
+			if !ok {
+				slog.DebugContext(ctx, "Channel is closed so insert remaining rows")
+				if len(bulkInsBatch) > 0 {
+					if err := bulkInsBatch.BulkInsert(ctx, db); err != nil {
+						slog.ErrorContext(ctx, "Failed to bulk insert", "error", err)
+					}
+				}
+				return
+			}
+
+			bulkInsBatch = append(bulkInsBatch, panelOrderItem...)
+			if len(bulkInsBatch) == batchSize {
+				if err := bulkInsBatch.BulkInsert(ctx, db); err != nil {
+					slog.ErrorContext(ctx, "Failed to bulk insert", "error", err)
+					return
+				}
+				bulkInsBatch = make(PanelOrderItems, 0, batchSize)
+			}
+		case <-ctx.Done():
+			slog.DebugContext(ctx, "Close channel to notify worker goroutines to stop")
+			return
+		}
+	}
 }
