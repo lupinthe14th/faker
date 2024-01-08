@@ -5,6 +5,8 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - "**.go"
+      - "go.mod"
+      - "go.sum"
 
 permissions:
   contents: read
