@@ -19,7 +19,7 @@ type PanelOrderItem struct {
 type PanelOrderItems []PanelOrderItem
 
 type DataItemCreator interface {
-	Create() (DataItems, error)
+	Create() (DataItems, error) // Create returns a slice of DataItem and error if the creation of DataItem fails due to any reason
 }
 
 type PanelOrderItemCreator struct{}
@@ -27,13 +27,13 @@ type PanelOrderItemCreator struct{}
 func (p *PanelOrderItemCreator) Create() (DataItems, error) {
 	var item PanelOrderItem
 	if err := gofakeit.Struct(&item); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create PanelOrderItem: %w", err)
 	}
 	return DataItems{PanelOrderItems{item}}, nil
 }
 
 type DataItem interface {
-	BulkInsert(ctx context.Context, db *sql.DB) error
+	BulkInsert(ctx context.Context, db *sql.DB) error // BulkInsert inserts the data item into the database and error if the bulk insertion of DataItems fails due to any reason
 }
 
 type DataItems []DataItem

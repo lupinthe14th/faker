@@ -109,7 +109,7 @@ func generateData(ctx context.Context, db *sql.DB, errChan chan<- error) {
 	}
 
 	// Launch bulk insert goroutine
-	go bulkInserter(ctx, db, dataChan, batchSize)
+	go bulkInserter(ctx, db, dataChan, batchSize, errChan)
 
 	wg.Wait()       // wait for worker goroutines to finish
 	close(dataChan) // close channel to notify bulk insert goroutine to stop
@@ -132,7 +132,7 @@ func worker(ctx context.Context, wg *sync.WaitGroup, dataChan chan<- DataItems, 
 	}
 }
 
-func bulkInserter(ctx context.Context, db *sql.DB, dataChan <-chan DataItems, batchSize int) {
+func bulkInserter(ctx context.Context, db *sql.DB, dataChan <-chan DataItems, batchSize int, errChan chan<- error) {
 	panelOrderItemsBatch := make(PanelOrderItems, 0, batchSize)
 
 	for {
@@ -141,7 +141,7 @@ func bulkInserter(ctx context.Context, db *sql.DB, dataChan <-chan DataItems, ba
 			if !ok {
 				slog.DebugContext(ctx, "Channel is closed so insert remaining rows")
 				if len(panelOrderItemsBatch) > 0 {
-					processBatch(ctx, db, panelOrderItemsBatch)
+					processBatch(ctx, db, panelOrderItemsBatch, errChan)
 				}
 				return
 			}
@@ -151,12 +151,14 @@ func bulkInserter(ctx context.Context, db *sql.DB, dataChan <-chan DataItems, ba
 				case PanelOrderItems:
 					panelOrderItemsBatch = append(panelOrderItemsBatch, v...)
 					if len(panelOrderItemsBatch) == batchSize {
-						processBatch(ctx, db, panelOrderItemsBatch)
+						processBatch(ctx, db, panelOrderItemsBatch, errChan)
 						panelOrderItemsBatch = make(PanelOrderItems, 0, batchSize)
 					}
 
 				default:
 					slog.ErrorContext(ctx, "Unknown type in batch", "type", fmt.Sprintf("%T", v))
+					errChan <- fmt.Errorf("unknown type in batch: %T", v)
+					return
 				}
 			}
 		case <-ctx.Done():
@@ -166,7 +168,7 @@ func bulkInserter(ctx context.Context, db *sql.DB, dataChan <-chan DataItems, ba
 	}
 }
 
-func processBatch(ctx context.Context, db *sql.DB, items interface{}) {
+func processBatch(ctx context.Context, db *sql.DB, items interface{}, errChan chan<- error) {
 	slog.DebugContext(ctx, "Processing batch", "item", fmt.Sprintf("%T", items))
 	switch v := items.(type) {
 	case PanelOrderItems:
@@ -176,5 +178,7 @@ func processBatch(ctx context.Context, db *sql.DB, items interface{}) {
 		}
 	default:
 		slog.ErrorContext(ctx, "Unknown type in batch", "type", fmt.Sprintf("%T", v))
+		errChan <- fmt.Errorf("unknown type in batch: %T", v)
+		return
 	}
 }
