@@ -105,7 +105,7 @@ func generateData(ctx context.Context, db *sql.DB, errChan chan<- error) {
 	// Launch worker goroutines
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
-		go worker(ctx, &wg, dataChan, numRecords/numWorkers, "PanelOrderItems", errChan)
+		go worker(ctx, &wg, dataChan, numRecords/numWorkers, &PanelOrderItemCreator{}, errChan)
 	}
 
 	// Launch bulk insert goroutine
@@ -115,23 +115,11 @@ func generateData(ctx context.Context, db *sql.DB, errChan chan<- error) {
 	close(dataChan) // close channel to notify bulk insert goroutine to stop
 }
 
-func worker(ctx context.Context, wg *sync.WaitGroup, dataChan chan<- DataItems, numRecords int, dataType string, errChan chan<- error) {
+func worker(ctx context.Context, wg *sync.WaitGroup, dataChan chan<- DataItems, numRecords int, creator DataItemCreator, errChan chan<- error) {
 	defer wg.Done()
 	for i := 0; i < numRecords; i++ {
-		var dataItems DataItems
-
-		switch dataType {
-		case "PanelOrderItems":
-			var item PanelOrderItem
-			if err := gofakeit.Struct(&item); err != nil {
-				errChan <- err
-				return
-			}
-			dataItems = DataItems{PanelOrderItems{item}}
-
-		default:
-			err := fmt.Errorf("unknown data type: %s", dataType)
-			slog.ErrorContext(ctx, "Unknown data type", "dataType", dataType)
+		dataItems, err := creator.Create()
+		if err != nil {
 			errChan <- err
 			return
 		}
