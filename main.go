@@ -168,9 +168,9 @@ func bulkInserter(ctx context.Context, db *sql.DB, dataChan <-chan DataItems, ba
 	}
 }
 
-func processBatch(ctx context.Context, db *sql.DB, items interface{}, errChan chan<- error) {
-	slog.DebugContext(ctx, "Processing batch", "item", fmt.Sprintf("%T", items))
-	switch v := items.(type) {
+func processBatch(ctx context.Context, db *sql.DB, di DataItem, errChan chan<- error) {
+	slog.DebugContext(ctx, "Processing batch", "item", fmt.Sprintf("%T", di))
+	switch v := di.(type) {
 	case PanelOrderItems:
 		slog.DebugContext(ctx, "Inserting PanelOrderItems", "numItems", len(v), "item", fmt.Sprintf("%T", v))
 		if err := v.BulkInsert(ctx, db); err != nil {
