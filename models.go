@@ -11,9 +11,9 @@ import (
 )
 
 type PanelOrderItem struct {
-	PanelOrderID int `fake:"{number:0,2147483647}"` // max int32
-	QuestionID   int `fake:"{number:0,2147483647}"` // max int32
-	OrderIndex   int `fake:"{number:0,2147483647}"` // max int32
+	PanelOrderID int64 `fake:"{number:1,1462491394}"`
+	QuestionID   int   `fake:"{number:1,3117100}"`
+	OrderIndex   int   `fake:"{number:0,1000}"`
 }
 
 type PanelOrderItems []PanelOrderItem

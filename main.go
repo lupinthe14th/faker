@@ -175,6 +175,8 @@ func processBatch(ctx context.Context, db *sql.DB, items interface{}, errChan ch
 		slog.DebugContext(ctx, "Inserting PanelOrderItems", "numItems", len(v), "item", fmt.Sprintf("%T", v))
 		if err := v.BulkInsert(ctx, db); err != nil {
 			slog.ErrorContext(ctx, "Failed to bulk insert", "error", err)
+			errChan <- fmt.Errorf("failed to bulk insert: %w", err)
+			return
 		}
 	default:
 		slog.ErrorContext(ctx, "Unknown type in batch", "type", fmt.Sprintf("%T", v))
