@@ -6,15 +6,37 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+
+	"github.com/brianvoe/gofakeit/v6"
 )
 
 type PanelOrderItem struct {
-	PanelOrderID int `fake:"{number:1,100}"`
-	QuestionID   int `fake:"{number:1,100}"`
-	OrderIndex   int `fake:"{number:1,100}"`
+	PanelOrderID int64 `fake:"{number:1,1462491394}"`
+	QuestionID   int   `fake:"{number:1,3117100}"`
+	OrderIndex   int   `fake:"{number:0,1000}"`
 }
 
 type PanelOrderItems []PanelOrderItem
+
+type DataItemCreator interface {
+	Create() (DataItems, error) // Create returns a slice of DataItem and error if the creation of DataItem fails due to any reason
+}
+
+type PanelOrderItemCreator struct{}
+
+func (p *PanelOrderItemCreator) Create() (DataItems, error) {
+	var item PanelOrderItem
+	if err := gofakeit.Struct(&item); err != nil {
+		return nil, fmt.Errorf("failed to create PanelOrderItem: %w", err)
+	}
+	return DataItems{PanelOrderItems{item}}, nil
+}
+
+type DataItem interface {
+	BulkInsert(ctx context.Context, db *sql.DB) error // BulkInsert inserts the data item into the database and error if the bulk insertion of DataItems fails due to any reason
+}
+
+type DataItems []DataItem
 
 func (ps PanelOrderItems) BulkInsert(ctx context.Context, db *sql.DB) error {
 	// Create query for bulk insert

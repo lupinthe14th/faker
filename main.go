@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -98,65 +99,88 @@ func generateData(ctx context.Context, db *sql.DB, errChan chan<- error) {
 	numRecords := *numRecordsPtr
 	slog.DebugContext(ctx, "Initialize goroutines configurations", "numRecords", numRecords)
 
-	dataChan := make(chan PanelOrderItems, batchSize)
+	dataChan := make(chan DataItems, batchSize)
 	var wg sync.WaitGroup
 
 	// Launch worker goroutines
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
-		go worker(ctx, &wg, dataChan, numRecords/numWorkers, errChan)
+		go worker(ctx, &wg, dataChan, numRecords/numWorkers, &PanelOrderItemCreator{}, errChan)
 	}
 
 	// Launch bulk insert goroutine
-	go bulkInserter(ctx, db, dataChan, batchSize)
+	go bulkInserter(ctx, db, dataChan, batchSize, errChan)
 
 	wg.Wait()       // wait for worker goroutines to finish
 	close(dataChan) // close channel to notify bulk insert goroutine to stop
 }
 
-func worker(ctx context.Context, wg *sync.WaitGroup, dataChan chan<- PanelOrderItems, numRecords int, errChan chan<- error) {
+func worker(ctx context.Context, wg *sync.WaitGroup, dataChan chan<- DataItems, numRecords int, creator DataItemCreator, errChan chan<- error) {
 	defer wg.Done()
 	for i := 0; i < numRecords; i++ {
-		panelOrderItem := PanelOrderItem{}
-		if err := gofakeit.Struct(&panelOrderItem); err != nil {
+		dataItems, err := creator.Create()
+		if err != nil {
 			errChan <- err
 			return
 		}
 
 		select {
-		case dataChan <- PanelOrderItems{panelOrderItem}: // send to channel
+		case dataChan <- dataItems:
 		case <-ctx.Done():
 			return // return to stop worker goroutine
 		}
 	}
 }
 
-func bulkInserter(ctx context.Context, db *sql.DB, dataChan <-chan PanelOrderItems, batchSize int) {
-	bulkInsBatch := make(PanelOrderItems, 0, batchSize)
+func bulkInserter(ctx context.Context, db *sql.DB, dataChan <-chan DataItems, batchSize int, errChan chan<- error) {
+	panelOrderItemsBatch := make(PanelOrderItems, 0, batchSize)
+
 	for {
 		select {
-		case panelOrderItem, ok := <-dataChan:
+		case items, ok := <-dataChan:
 			if !ok {
 				slog.DebugContext(ctx, "Channel is closed so insert remaining rows")
-				if len(bulkInsBatch) > 0 {
-					if err := bulkInsBatch.BulkInsert(ctx, db); err != nil {
-						slog.ErrorContext(ctx, "Failed to bulk insert", "error", err)
-					}
+				if len(panelOrderItemsBatch) > 0 {
+					processBatch(ctx, db, panelOrderItemsBatch, errChan)
 				}
 				return
 			}
 
-			bulkInsBatch = append(bulkInsBatch, panelOrderItem...)
-			if len(bulkInsBatch) == batchSize {
-				if err := bulkInsBatch.BulkInsert(ctx, db); err != nil {
-					slog.ErrorContext(ctx, "Failed to bulk insert", "error", err)
+			for _, item := range items {
+				switch v := item.(type) {
+				case PanelOrderItems:
+					panelOrderItemsBatch = append(panelOrderItemsBatch, v...)
+					if len(panelOrderItemsBatch) == batchSize {
+						processBatch(ctx, db, panelOrderItemsBatch, errChan)
+						panelOrderItemsBatch = panelOrderItemsBatch[:0]
+					}
+
+				default:
+					slog.ErrorContext(ctx, "Unknown type in batch", "type", fmt.Sprintf("%T", v))
+					errChan <- fmt.Errorf("unknown type in batch: %T", v)
 					return
 				}
-				bulkInsBatch = make(PanelOrderItems, 0, batchSize)
 			}
 		case <-ctx.Done():
 			slog.DebugContext(ctx, "Close channel to notify worker goroutines to stop")
 			return
 		}
+	}
+}
+
+func processBatch(ctx context.Context, db *sql.DB, di DataItem, errChan chan<- error) {
+	slog.DebugContext(ctx, "Processing batch", "item", fmt.Sprintf("%T", di))
+	switch v := di.(type) {
+	case PanelOrderItems:
+		slog.DebugContext(ctx, "Inserting PanelOrderItems", "numItems", len(v), "item", fmt.Sprintf("%T", v))
+		if err := v.BulkInsert(ctx, db); err != nil {
+			slog.ErrorContext(ctx, "Failed to bulk insert", "error", err)
+			errChan <- fmt.Errorf("failed to bulk insert: %w", err)
+			return
+		}
+	default:
+		slog.ErrorContext(ctx, "Unknown type in batch", "type", fmt.Sprintf("%T", v))
+		errChan <- fmt.Errorf("unknown type in batch: %T", v)
+		return
 	}
 }
