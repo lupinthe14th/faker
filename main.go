@@ -152,7 +152,7 @@ func bulkInserter(ctx context.Context, db *sql.DB, dataChan <-chan DataItems, ba
 					panelOrderItemsBatch = append(panelOrderItemsBatch, v...)
 					if len(panelOrderItemsBatch) == batchSize {
 						processBatch(ctx, db, panelOrderItemsBatch, errChan)
-						panelOrderItemsBatch = make(PanelOrderItems, 0, batchSize)
+						panelOrderItemsBatch = panelOrderItemsBatch[:0]
 					}
 
 				default:
