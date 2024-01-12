@@ -140,12 +140,12 @@ func TestGetEnvAsBool(t *testing.T) {
 		want  bool
 	}{
 		{
-			name:  "Successful Get Env Bool by Default",
+			name:  "Get Env Bool with false by Default",
 			setup: func() {},
 			want:  false,
 		},
 		{
-			name: "Successful Get Env Bool by Env",
+			name: "Get Env Bool with true in lowercase",
 			setup: func() {
 				// set env
 				t.Setenv("TEST_BOOL", "true")
@@ -153,7 +153,7 @@ func TestGetEnvAsBool(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "Get Env Bool with different casing",
+			name: "Get Env Bool with true in Titlecase",
 			setup: func() {
 				// set env
 				t.Setenv("TEST_BOOL", "True")
@@ -161,7 +161,7 @@ func TestGetEnvAsBool(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "Get Env Bool with different casing",
+			name: "Get Env Bool with true in Uppercase",
 			setup: func() {
 				// set env
 				t.Setenv("TEST_BOOL", "TRUE")
@@ -169,7 +169,7 @@ func TestGetEnvAsBool(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "Get Env Bool with different casing",
+			name: "Get Env Bool with false as 0",
 			setup: func() {
 				// set env
 				t.Setenv("TEST_BOOL", "0")
@@ -177,7 +177,7 @@ func TestGetEnvAsBool(t *testing.T) {
 			want: false,
 		},
 		{
-			name: "Get Env Bool with different casing",
+			name: "Get Env Bool with true as 1",
 			setup: func() {
 				// set env
 				t.Setenv("TEST_BOOL", "1")
