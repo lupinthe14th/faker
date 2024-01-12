@@ -12,10 +12,11 @@ import (
 )
 
 type DBConfig struct {
-	DBName   string
-	User     string
-	Password string
-	Addr     string
+	DBName               string
+	User                 string
+	Password             string
+	Addr                 string
+	AllowNativePasswords bool
 }
 
 type sqlOpenFunc func(driverName, dataSourceName string) (*sql.DB, error)
@@ -24,23 +25,25 @@ var sqlOpen sqlOpenFunc = sql.Open
 
 func NewDBConfig() *DBConfig {
 	return &DBConfig{
-		DBName:   getEnv("MYSQL_DATABASE", "mydatabase"),
-		User:     getEnv("MYSQL_USER", "user"),
-		Password: getEnv("MYSQL_PASSWORD", "password"),
-		Addr:     getEnvAddr("MYSQL_HOST", "MYSQL_PORT", "localhost", "3306"),
+		DBName:               getEnv("MYSQL_DATABASE", "mydatabase"),
+		User:                 getEnv("MYSQL_USER", "user"),
+		Password:             getEnv("MYSQL_PASSWORD", "password"),
+		Addr:                 getEnvAddr("MYSQL_HOST", "MYSQL_PORT", "localhost", "3306"),
+		AllowNativePasswords: getEnvAsBool("MYSQL_ALLOW_NATIVE_PASSWORDS", false),
 	}
 }
 
 func connectDB(ctx context.Context, config *DBConfig) (*sql.DB, error) {
 	c := mysql.Config{
-		DBName:    config.DBName,
-		User:      config.User,
-		Passwd:    config.Password,
-		Addr:      config.Addr,
-		Net:       "tcp",
-		ParseTime: true,
-		Collation: "utf8mb4_general_ci",
-		Loc:       time.Local,
+		DBName:               config.DBName,
+		User:                 config.User,
+		Passwd:               config.Password,
+		Addr:                 config.Addr,
+		AllowNativePasswords: config.AllowNativePasswords,
+		Net:                  "tcp",
+		ParseTime:            true,
+		Collation:            "utf8mb4_general_ci",
+		Loc:                  time.Local,
 	}
 
 	db, err := sqlOpen("mysql", c.FormatDSN())
@@ -69,4 +72,12 @@ func getEnvAddr(hostKey, portKey, hostDefault, portDefault string) string {
 	host := getEnv(hostKey, hostDefault)
 	port := getEnv(portKey, portDefault)
 	return strings.Join([]string{host, port}, ":")
+}
+
+func getEnvAsBool(key string, defaultValue bool) bool {
+	value, ok := os.LookupEnv(key)
+	if !ok {
+		return defaultValue
+	}
+	return value == "1" || strings.ToLower(value) == "true"
 }
