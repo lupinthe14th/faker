@@ -132,3 +132,67 @@ func TestGetEnvAddr(t *testing.T) {
 		})
 	}
 }
+
+func TestGetEnvAsBool(t *testing.T) {
+	tests := []struct {
+		name  string
+		setup func()
+		want  bool
+	}{
+		{
+			name:  "Get Env Bool with false by Default",
+			setup: func() {},
+			want:  false,
+		},
+		{
+			name: "Get Env Bool with true in lowercase",
+			setup: func() {
+				// set env
+				t.Setenv("TEST_BOOL", "true")
+			},
+			want: true,
+		},
+		{
+			name: "Get Env Bool with true in Titlecase",
+			setup: func() {
+				// set env
+				t.Setenv("TEST_BOOL", "True")
+			},
+			want: true,
+		},
+		{
+			name: "Get Env Bool with true in Uppercase",
+			setup: func() {
+				// set env
+				t.Setenv("TEST_BOOL", "TRUE")
+			},
+			want: true,
+		},
+		{
+			name: "Get Env Bool with false as 0",
+			setup: func() {
+				// set env
+				t.Setenv("TEST_BOOL", "0")
+			},
+			want: false,
+		},
+		{
+			name: "Get Env Bool with true as 1",
+			setup: func() {
+				// set env
+				t.Setenv("TEST_BOOL", "1")
+			},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setup()
+			got := getEnvAsBool("TEST_BOOL", false)
+			if got != tt.want {
+				t.Errorf("getEnvAsBool() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
