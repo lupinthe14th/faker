@@ -152,6 +152,38 @@ func TestGetEnvAsBool(t *testing.T) {
 			},
 			want: true,
 		},
+		{
+			name: "Get Env Bool with different casing",
+			setup: func() {
+				// set env
+				t.Setenv("TEST_BOOL", "True")
+			},
+			want: true,
+		},
+		{
+			name: "Get Env Bool with different casing",
+			setup: func() {
+				// set env
+				t.Setenv("TEST_BOOL", "TRUE")
+			},
+			want: true,
+		},
+		{
+			name: "Get Env Bool with different casing",
+			setup: func() {
+				// set env
+				t.Setenv("TEST_BOOL", "0")
+			},
+			want: false,
+		},
+		{
+			name: "Get Env Bool with different casing",
+			setup: func() {
+				// set env
+				t.Setenv("TEST_BOOL", "1")
+			},
+			want: true,
+		},
 	}
 
 	for _, tt := range tests {
