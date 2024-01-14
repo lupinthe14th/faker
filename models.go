@@ -39,6 +39,25 @@ type DataItem interface {
 type DataItems []DataItem
 
 func (ps PanelOrderItems) BulkInsert(ctx context.Context, db *sql.DB) error {
+	query, params := buildInsertQuery(ps)
+
+	txn, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() {
+		handleTransaction(ctx, txn)
+	}()
+
+	if err := executeInsert(ctx, txn, query, params); err != nil {
+		return err
+	}
+
+	return txn.Commit()
+}
+
+// buildInsertQuery builds the SQL query and parameters for bulk insert.
+func buildInsertQuery(ps PanelOrderItems) (string, []interface{}) {
 	// Create query for bulk insert
 	var query strings.Builder
 	query.WriteString("INSERT INTO panel_order_items (panel_order_id, question_id, order_index) VALUES ")
@@ -55,25 +74,12 @@ func (ps PanelOrderItems) BulkInsert(ctx context.Context, db *sql.DB) error {
 		params = append(params, p.PanelOrderID, p.QuestionID, p.OrderIndex)
 	}
 
-	txn, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() {
-		// rollback if panic
-		if p := recover(); p != nil {
-			if err := txn.Rollback(); err != nil && err != sql.ErrTxDone {
-				slog.ErrorContext(ctx, "failed to rollback transaction after panic", "error", err)
-			}
-			panic(p) // re-throw panic after Rollback
-		} else if rerr := txn.Rollback(); rerr != nil && rerr != sql.ErrTxDone {
-			// err is non-nil; stop the panic and return error
-			slog.ErrorContext(ctx, "failed to rollback transaction", "error", rerr)
-			return
-		}
-	}()
+	return query.String(), params
+}
 
-	result, err := txn.ExecContext(ctx, query.String(), params...)
+// executeInsert executes the insert query in the given transaction.
+func executeInsert(ctx context.Context, txn *sql.Tx, query string, params []interface{}) error {
+	result, err := txn.ExecContext(ctx, query, params...)
 	if err != nil {
 		return fmt.Errorf("failed to insert multiple records: %w", err)
 	}
@@ -90,5 +96,20 @@ func (ps PanelOrderItems) BulkInsert(ctx context.Context, db *sql.DB) error {
 
 	slog.DebugContext(ctx, "inserted multiple records", "rows_affected", rows, "last_insert_id", lastID)
 
-	return txn.Commit()
+	return nil
+}
+
+// handleTransaction handles the finalization of the transaction.
+func handleTransaction(ctx context.Context, txn *sql.Tx) {
+	// rollback if panic
+	if p := recover(); p != nil {
+		if err := txn.Rollback(); err != nil && err != sql.ErrTxDone {
+			slog.ErrorContext(ctx, "failed to rollback transaction after panic", "error", err)
+		}
+		panic(p) // re-throw panic after Rollback
+	} else if rerr := txn.Rollback(); rerr != nil && rerr != sql.ErrTxDone {
+		// err is non-nil; stop the panic and return error
+		slog.ErrorContext(ctx, "failed to rollback transaction", "error", rerr)
+		return
+	}
 }
