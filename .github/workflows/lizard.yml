@@ -1,7 +1,8 @@
 ---
 name: Lizard Runner
 on:
-  push:
+  pull_request:
+    types: [opened, synchronize, reopened]
 
 jobs:
   lizard:
