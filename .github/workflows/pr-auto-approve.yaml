@@ -16,6 +16,6 @@ jobs:
     permissions:
       pull-requests: write
     steps:
-      - uses: hmarr/auto-approve-action@v3
+      - uses: hmarr/auto-approve-action@7d0ab8fdbb906da8a6297d373561d5ccb137d98f # v3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
