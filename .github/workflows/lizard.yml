@@ -8,6 +8,6 @@ jobs:
   lizard:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       - name: Lizard Runner
-        uses: Uno-Takashi/Lizard-Runner@v3
+        uses: Uno-Takashi/Lizard-Runner@84be77b3a59d9a98a74c46018adfbd5110dc9744 # v3
