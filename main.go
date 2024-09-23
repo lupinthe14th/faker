@@ -12,7 +12,8 @@ import (
 	"syscall"
 
 	"github.com/alecthomas/kingpin/v2"
-	"github.com/brianvoe/gofakeit/v6"
+	"github.com/brianvoe/gofakeit/v7"
+	"github.com/brianvoe/gofakeit/v7/source"
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -51,8 +52,8 @@ func main() {
 	errChan := make(chan error, 1)
 
 	// Initialize gofakeit
-	faker := gofakeit.NewCrypto()
-	gofakeit.SetGlobalFaker(faker)
+	faker := gofakeit.NewFaker(source.NewCrypto(), true)
+	gofakeit.GlobalFaker = faker
 
 	db, err := connectDB(ctx, NewDBConfig())
 	if err != nil {
