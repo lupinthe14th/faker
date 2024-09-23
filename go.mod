@@ -7,7 +7,7 @@ toolchain go1.23.1
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/alecthomas/kingpin/v2 v2.4.0
-	github.com/brianvoe/gofakeit/v6 v6.28.0
+	github.com/brianvoe/gofakeit/v7 v7.0.4
 	github.com/brianvoe/gofakeit/v7 v7.0.4
 	github.com/go-sql-driver/mysql v1.8.1
 )
