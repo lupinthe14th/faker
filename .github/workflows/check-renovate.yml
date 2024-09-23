@@ -1,0 +1,20 @@
+---
+name: renovate-config-validator
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "renovate.json"
+      - ".github/workflows/check-renovate.yml"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - uses: suzuki-shunsuke/github-action-renovate-config-validator@36a15b83e37bf3221dc9c02ff5ffdaefb51ca1cf # v1.1.0
+        with:
+          config-path: renovate.json
