@@ -6,8 +6,11 @@
   "packageRules": [
     {
       "matchPackageNames": [
-        "!mysql"
-      ]
+        "mysql"
+      ],
+      "major": {
+        "schedule": "after 6am and before 5pm every weekday of June"
+      }
     }
   ],
   "postUpdateOptions": [
