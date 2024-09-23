@@ -5,8 +5,8 @@
   ],
   "packageRules": [
     {
-      "excludePackageNames": [
-        "mysql"
+      "matchPackageNames": [
+        "!mysql"
       ]
     }
   ],
