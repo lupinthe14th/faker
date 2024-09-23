@@ -7,3 +7,5 @@ rules:
     level: warning
     max: 192
   truthy: disable
+  comments:
+    min-spaces-from-content: 1
