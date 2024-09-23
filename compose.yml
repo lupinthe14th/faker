@@ -16,7 +16,7 @@ services:
     command: go run ./...
 
   db:
-    image: mysql:8.4.2
+    image: mysql:9.0.1@sha256:92dc869678019f65d761155dacac660a904f6245bfe1b7997da0a73b2bfc68c9
     environment:
       MYSQL_ROOT_PASSWORD: rootpassword
       MYSQL_DATABASE: mydatabase
