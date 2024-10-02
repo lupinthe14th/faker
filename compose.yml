@@ -1,7 +1,7 @@
 ---
 services:
   app:
-    image: golang:1.23.1
+    image: golang:1.23.2@sha256:adee809c2d0009a4199a11a1b2618990b244c6515149fe609e2788ddf164bd10
     depends_on:
       db:
         condition: service_healthy
